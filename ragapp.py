@@ -10,13 +10,21 @@ from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
-# Load environment variables (.env)
+# Load environment variables (.env locally)
 load_dotenv()
+
+# Safely retrieve API key from Streamlit Secrets or local environment
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 st.set_page_config(page_title="RAG Document Q&A (Gemini)", page_icon="📚", layout="centered")
 
 st.title("📚 Chat with your PDF (Powered by Google Gemini)")
 st.caption("Upload a PDF document and ask questions based strictly on its contents.")
+
+# Check for API Key presence
+if not api_key:
+    st.error("Missing GOOGLE_API_KEY! Please set it in your local `.env` file or Streamlit Cloud Secrets.")
+    st.stop()
 
 # Initialize session states
 if "vector_store" not in st.session_state:
@@ -44,8 +52,11 @@ def create_vector_store(text):
     )
     chunks = text_splitter.split_text(text)
 
-    # Use Google Gemini Embeddings
-    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+    # Use Google Gemini Embeddings with standard model identifier & explicit key
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=api_key
+    )
     vector_store = FAISS.from_texts(texts=chunks, embedding=embeddings)
     return vector_store
 
@@ -79,7 +90,7 @@ for message in st.session_state.messages:
 
 # User query logic
 if user_query := st.chat_input("Ask a question about your uploaded document..."):
-    if st.session_state.vector_store is None:
+    if st.session_state.vector_store is None:   
         st.error("Please upload and process a document in the sidebar first!")
     else:
         st.session_state.messages.append({"role": "user", "content": user_query})
@@ -92,9 +103,10 @@ if user_query := st.chat_input("Ask a question about your uploaded document...")
                     search_kwargs={"k": 3}
                 )
 
-                # Initialize Gemini Chat Model
+                # Initialize Gemini Chat Model with explicit key and retry logic
                 llm = ChatGoogleGenerativeAI(
                     model="gemini-3.5-flash",
+                    google_api_key=api_key,
                     temperature=0,
                     max_retries=5
                 )
