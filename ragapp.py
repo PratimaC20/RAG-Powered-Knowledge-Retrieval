@@ -54,7 +54,7 @@ def create_vector_store(text):
 
     # Use Google Gemini Embeddings with standard model identifier & explicit key
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-004",
+        model="gemini-embedding-001",
         google_api_key=api_key
     )
     vector_store = FAISS.from_texts(texts=chunks, embedding=embeddings)
